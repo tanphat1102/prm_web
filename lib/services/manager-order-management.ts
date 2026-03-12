@@ -14,7 +14,7 @@ const API_BASE_URL =
 const MANAGER_API_BASE_URL =
   process.env.NEXT_PUBLIC_MANAGER_API_BASE_URL?.replace(/\/$/, "") ||
   API_BASE_URL ||
-  "https://prm392-kitchen-be.onrender.com";
+  "https://chicken-kitchen.milize-lena.space/";
 
 export type OrderStatus =
   | "PENDING"

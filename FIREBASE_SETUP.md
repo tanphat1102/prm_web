@@ -40,7 +40,7 @@ NEXT_PUBLIC_FIREBASE_PROJECT_ID=prm392-kitchen
 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=prm392-kitchen.firebasestorage.app
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=315695684466
 
-NEXT_PUBLIC_MANAGER_API_BASE_URL=https://prm392-kitchen-be.onrender.com
+NEXT_PUBLIC_MANAGER_API_BASE_URL=https://chicken-kitchen.milize-lena.space
 ```
 
 ## 4. Sử dụng
@@ -53,7 +53,7 @@ NEXT_PUBLIC_MANAGER_API_BASE_URL=https://prm392-kitchen-be.onrender.com
 **Trang duyệt đơn hàng:**
 
 - Sau khi đăng nhập, truy cập `/dashboard/orders`
-- Danh sách đơn từ backend `https://prm392-kitchen-be.onrender.com/api/manager/orders`
+- Danh sách đơn từ backend `https://chicken-kitchen.milize-lena.space/api/manager/orders`
 
 ## 5. Flow Authorization
 
