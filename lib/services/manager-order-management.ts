@@ -1,3 +1,4 @@
+import { buildApiUrl } from "@/lib/config/api";
 import {
   authController,
   type ApiResponse,
@@ -8,14 +9,6 @@ import {
   getRefreshToken,
   saveAuthTokens,
 } from "@/lib/services/token-storage";
-
-const DEFAULT_API_BASE_URL = "https://chicken-kitchen.milize-lena.space";
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ||
-  DEFAULT_API_BASE_URL;
-const MANAGER_API_BASE_URL =
-  process.env.NEXT_PUBLIC_MANAGER_API_BASE_URL?.replace(/\/$/, "") ||
-  API_BASE_URL;
 
 export type OrderStatus =
   | "PENDING"
@@ -73,7 +66,7 @@ async function requestWithAuth<TResponse>(
 ): Promise<TResponse> {
   const accessToken = getAccessToken();
 
-  const response = await fetch(`${MANAGER_API_BASE_URL}${path}`, {
+  const response = await fetch(buildApiUrl(path, "manager"), {
     ...init,
     headers: {
       "Content-Type": "application/json",

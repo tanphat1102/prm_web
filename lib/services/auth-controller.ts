@@ -1,3 +1,5 @@
+import { buildApiUrl } from "@/lib/config/api";
+
 export type ApiResponse<T> = {
   success: boolean;
   message: string;
@@ -17,17 +19,12 @@ export type RefreshTokenRequest = {
   refreshToken: string;
 };
 
-const DEFAULT_API_BASE_URL = "https://chicken-kitchen.milize-lena.space";
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ||
-  DEFAULT_API_BASE_URL;
-
 async function postJson<TResponse, TBody = unknown>(
   path: string,
   body?: TBody,
   options?: RequestInit,
 ): Promise<TResponse> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(buildApiUrl(path), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
