@@ -1,4 +1,4 @@
-import { buildApiUrl } from "@/lib/config/api";
+﻿import { buildApiUrl } from "@/lib/config/api";
 import {
   authController,
   type ApiResponse,
@@ -11,55 +11,101 @@ import {
 } from "@/lib/services/token-storage";
 
 export type OrderStatus =
-  | "PENDING"
-  | "APPROVED"
-  | "REJECTED"
-  | "PREPARING"
-  | "SHIPPING"
-  | "DELIVERED"
+  | "CREATED"
+  | "CONFIRMED"
+  | "PROCESSING"
+  | "READY"
+  | "COMPLETED"
   | "CANCELLED";
 
+export type OrderFilterStatus =
+  | "CONFIRMED"
+  | "PROCESSING"
+  | "READY"
+  | "COMPLETED";
+
+export type ManagerOrderDishItem = {
+  orderDishItemId: number;
+  stepId: number;
+  itemId: number;
+  itemName: string;
+  itemImageUrl: string;
+  unit: string;
+  quantity: number;
+  price: number;
+  calories: number;
+  note: string;
+};
+
+export type ManagerOrderDish = {
+  orderDishId: number;
+  dishId: number;
+  dishName: string;
+  dishImageUrl: string;
+  dishStatus: string;
+  dishPrice: number;
+  dishCalories: number;
+  quantity: number;
+  lineTotal: number;
+  customItems: ManagerOrderDishItem[];
+};
+
 export type ManagerOrder = {
-  id: string;
-  code: string;
-  customerName: string;
-  customerPhone?: string;
-  totalAmount: number;
+  orderId: string;
+  userId: string;
+  totalPrice: number;
+  discountAmount: number;
+  finalAmount: number;
   status: OrderStatus;
   createdAt: string;
-  shippingAddress?: string;
-  notes?: string;
-  shipperId?: string;
+  pickupAt: string;
+  note: string;
+  dishes: ManagerOrderDish[];
 };
 
 export type OrderListResponse = {
   items: ManagerOrder[];
-  total: number;
-  page: number;
-  size: number;
+  pageNumber: number;
+  pageSize: number;
+  totalElements: number;
+  totalPages: number;
+  first: boolean;
+  last: boolean;
 };
 
 export type ListOrdersParams = {
   page?: number;
   size?: number;
-  status?: OrderStatus | "ALL";
-  keyword?: string;
+  status?: OrderFilterStatus | "ALL";
+};
+
+type RawOrderDishItem = Partial<ManagerOrderDishItem> & {
+  id?: number;
+};
+
+type RawOrderDish = Partial<ManagerOrderDish> & {
+  id?: number;
+  customItems?: RawOrderDishItem[];
 };
 
 type RawManagerOrder = Partial<ManagerOrder> & {
-  customer?: {
-    name?: string;
-    fullName?: string;
-    phone?: string;
-  };
-  customerFullName?: string;
-  phoneNumber?: string;
-  total?: number | string;
-  amount?: number | string;
-  finalAmount?: number | string;
-  shippingFee?: number | string;
-  address?: string;
-  deliveryAddress?: string;
+  id?: string;
+  dishes?: RawOrderDish[];
+};
+
+type RawOrderList = {
+  content?: RawManagerOrder[];
+  items?: RawManagerOrder[];
+  pageNumber?: number;
+  number?: number;
+  page?: number;
+  pageSize?: number;
+  size?: number;
+  totalElements?: number;
+  total?: number;
+  totalPages?: number;
+  first?: boolean;
+  last?: boolean;
 };
 
 function buildQuery(params: ListOrdersParams) {
@@ -67,9 +113,9 @@ function buildQuery(params: ListOrdersParams) {
 
   if (params.page !== undefined) search.set("page", String(params.page));
   if (params.size !== undefined) search.set("size", String(params.size));
-  if (params.keyword) search.set("keyword", params.keyword);
-  if (params.status && params.status !== "ALL")
+  if (params.status && params.status !== "ALL") {
     search.set("status", params.status);
+  }
 
   const queryString = search.toString();
   return queryString ? `?${queryString}` : "";
@@ -114,50 +160,6 @@ async function requestWithAuth<TResponse>(
   return payload as TResponse;
 }
 
-type RawOrderList = {
-  content?: RawManagerOrder[];
-  items?: RawManagerOrder[];
-  totalElements?: number;
-  total?: number;
-  number?: number;
-  page?: number;
-  size?: number;
-  limit?: number;
-};
-
-function normalizeMoney(value: unknown): number {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string") {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-  return 0;
-}
-
-function normalizeOrder(order: RawManagerOrder): ManagerOrder {
-  return {
-    id: order.id ?? "",
-    code: order.code ?? "",
-    customerName:
-      order.customerName ??
-      order.customer?.name ??
-      order.customer?.fullName ??
-      order.customerFullName ??
-      "Khách hàng chưa xác định",
-    customerPhone:
-      order.customerPhone ?? order.customer?.phone ?? order.phoneNumber,
-    totalAmount: normalizeMoney(
-      order.totalAmount ?? order.total ?? order.amount ?? order.finalAmount,
-    ),
-    status: (order.status ?? "PENDING") as OrderStatus,
-    createdAt: order.createdAt ?? "",
-    shippingAddress:
-      order.shippingAddress ?? order.address ?? order.deliveryAddress,
-    notes: order.notes,
-    shipperId: order.shipperId,
-  };
-}
-
 function unwrapPayload<T>(payload: unknown): T {
   const wrapped = payload as ApiResponse<T>;
   if (
@@ -171,6 +173,62 @@ function unwrapPayload<T>(payload: unknown): T {
   return payload as T;
 }
 
+function normalizeNumber(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+function normalizeDishItem(item: RawOrderDishItem): ManagerOrderDishItem {
+  return {
+    orderDishItemId: normalizeNumber(item.orderDishItemId ?? item.id),
+    stepId: normalizeNumber(item.stepId),
+    itemId: normalizeNumber(item.itemId),
+    itemName: item.itemName ?? "",
+    itemImageUrl: item.itemImageUrl ?? "",
+    unit: item.unit ?? "",
+    quantity: normalizeNumber(item.quantity),
+    price: normalizeNumber(item.price),
+    calories: normalizeNumber(item.calories),
+    note: item.note ?? "",
+  };
+}
+
+function normalizeDish(dish: RawOrderDish): ManagerOrderDish {
+  return {
+    orderDishId: normalizeNumber(dish.orderDishId ?? dish.id),
+    dishId: normalizeNumber(dish.dishId),
+    dishName: dish.dishName ?? "",
+    dishImageUrl: dish.dishImageUrl ?? "",
+    dishStatus: dish.dishStatus ?? "",
+    dishPrice: normalizeNumber(dish.dishPrice),
+    dishCalories: normalizeNumber(dish.dishCalories),
+    quantity: normalizeNumber(dish.quantity),
+    lineTotal: normalizeNumber(dish.lineTotal),
+    customItems: (Array.isArray(dish.customItems) ? dish.customItems : []).map(
+      normalizeDishItem,
+    ),
+  };
+}
+
+function normalizeOrder(order: RawManagerOrder): ManagerOrder {
+  return {
+    orderId: order.orderId ?? order.id ?? "",
+    userId: order.userId ?? "",
+    totalPrice: normalizeNumber(order.totalPrice),
+    discountAmount: normalizeNumber(order.discountAmount),
+    finalAmount: normalizeNumber(order.finalAmount),
+    status: (order.status ?? "CREATED") as OrderStatus,
+    createdAt: order.createdAt ?? "",
+    pickupAt: order.pickupAt ?? "",
+    note: order.note ?? "",
+    dishes: (Array.isArray(order.dishes) ? order.dishes : []).map(normalizeDish),
+  };
+}
+
 function normalizeOrderList(payload: unknown): ApiResponse<OrderListResponse> {
   const unwrapped = unwrapPayload<RawOrderList>(payload);
 
@@ -180,29 +238,30 @@ function normalizeOrderList(payload: unknown): ApiResponse<OrderListResponse> {
       (Array.isArray(unwrapped?.content) ? unwrapped.content : [])
     ).map(normalizeOrder);
 
-  const total = unwrapped?.total ?? unwrapped?.totalElements ?? items.length;
-  const page = unwrapped?.page ?? unwrapped?.number ?? 0;
-  const size = unwrapped?.size ?? unwrapped?.limit ?? items.length;
+  const pageNumber =
+    unwrapped?.pageNumber ?? unwrapped?.number ?? unwrapped?.page ?? 0;
+  const pageSize = unwrapped?.pageSize ?? unwrapped?.size ?? items.length;
+  const totalElements =
+    unwrapped?.totalElements ?? unwrapped?.total ?? items.length;
+  const totalPages =
+    unwrapped?.totalPages ??
+    (pageSize > 0 ? Math.ceil(totalElements / pageSize) : 1);
 
   return {
     success: true,
     message: "OK",
     data: {
       items,
-      total,
-      page,
-      size,
+      pageNumber,
+      pageSize,
+      totalElements,
+      totalPages,
+      first: Boolean(unwrapped?.first ?? pageNumber <= 0),
+      last:
+        typeof unwrapped?.last === "boolean"
+          ? unwrapped.last
+          : pageNumber >= Math.max(0, totalPages - 1),
     },
-  };
-}
-
-function normalizeOrderDetail(payload: unknown): ApiResponse<ManagerOrder> {
-  const unwrapped = unwrapPayload<RawManagerOrder>(payload);
-
-  return {
-    success: true,
-    message: "OK",
-    data: normalizeOrder(unwrapped ?? {}),
   };
 }
 
@@ -214,58 +273,22 @@ export const managerOrderManagementService = {
     return normalizeOrderList(payload);
   },
 
-  getOrderById(orderId: string) {
-    return requestWithAuth<unknown>(
-      `/api/manager/orders/${orderId}`,
-    ).then(normalizeOrderDetail);
-  },
-
-  approveOrder(orderId: string) {
+  nextStatus(orderId: string) {
     return requestWithAuth<ApiResponse<ManagerOrder>>(
-      `/api/manager/orders/${orderId}/approve`,
-      {
-        method: "POST",
-      },
-    );
-  },
-
-  rejectOrder(orderId: string, reason: string) {
-    return requestWithAuth<ApiResponse<ManagerOrder>>(
-      `/api/manager/orders/${orderId}/reject`,
-      {
-        method: "POST",
-        body: JSON.stringify({ reason }),
-      },
-    );
-  },
-
-  updateOrderStatus(orderId: string, status: OrderStatus) {
-    return requestWithAuth<ApiResponse<ManagerOrder>>(
-      `/api/manager/orders/${orderId}/status`,
+      `/api/manager/orders/${orderId}/next-status`,
       {
         method: "PATCH",
-        body: JSON.stringify({ status }),
       },
     );
   },
 
-  assignShipper(orderId: string, shipperId: string) {
-    return requestWithAuth<ApiResponse<ManagerOrder>>(
-      `/api/manager/orders/${orderId}/assign-shipper`,
-      {
-        method: "POST",
-        body: JSON.stringify({ shipperId }),
-      },
-    );
-  },
-
-  cancelOrder(orderId: string, reason: string) {
+  cancelOrder(orderId: string) {
     return requestWithAuth<ApiResponse<ManagerOrder>>(
       `/api/manager/orders/${orderId}/cancel`,
       {
-        method: "POST",
-        body: JSON.stringify({ reason }),
+        method: "PATCH",
       },
     );
   },
 };
+

@@ -1,14 +1,7 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Search,
-  RefreshCcw,
-  CheckCircle2,
-  XCircle,
-  Truck,
-  Ban,
-} from "lucide-react";
+import { Ban, ChevronRight, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,7 +10,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -38,67 +30,68 @@ import {
   managerOrderManagementService,
   type ListOrdersParams,
   type ManagerOrder,
+  type OrderFilterStatus,
   type OrderStatus,
 } from "@/lib/services/manager-order-management";
 
-type OrderFilterStatus = OrderStatus | "ALL";
+type FilterStatus = OrderFilterStatus | "ALL";
 
-const statusOptions: OrderFilterStatus[] = [
+const statusOptions: FilterStatus[] = [
   "ALL",
-  "PENDING",
-  "APPROVED",
-  "REJECTED",
-  "PREPARING",
-  "SHIPPING",
-  "DELIVERED",
-  "CANCELLED",
-];
-
-const statusActionOptions: OrderStatus[] = [
-  "PENDING",
-  "APPROVED",
-  "REJECTED",
-  "PREPARING",
-  "SHIPPING",
-  "DELIVERED",
-  "CANCELLED",
+  "CONFIRMED",
+  "PROCESSING",
+  "READY",
+  "COMPLETED",
 ];
 
 function statusBadgeVariant(
   status: OrderStatus,
 ): "default" | "secondary" | "destructive" | "outline" {
-  if (status === "DELIVERED") return "default";
-  if (status === "CANCELLED" || status === "REJECTED") return "destructive";
-  if (status === "PENDING") return "secondary";
+  if (status === "COMPLETED") return "default";
+  if (status === "CANCELLED") return "destructive";
+  if (status === "CONFIRMED") return "secondary";
   return "outline";
 }
 
 function formatCurrency(value: number | undefined) {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    return "0₫";
-  }
-
+  if (typeof value !== "number" || !Number.isFinite(value)) return "0₫";
   return `${value.toLocaleString("vi-VN")}₫`;
+}
+
+function formatDate(value: string) {
+  if (!value) return "-";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "-";
+  return parsed.toLocaleString("vi-VN");
+}
+
+function shortId(value: string) {
+  if (!value) return "-";
+  return value.length <= 10 ? value : `${value.slice(0, 8)}...`;
 }
 
 export default function ManagerOrdersPage() {
   const [orders, setOrders] = useState<ManagerOrder[]>([]);
-  const [selectedOrder, setSelectedOrder] = useState<ManagerOrder | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [actionLoading, setActionLoading] = useState(false);
+  const [actionLoadingOrderId, setActionLoadingOrderId] = useState<string | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
 
   const [page, setPage] = useState(0);
   const [size] = useState(10);
-  const [total, setTotal] = useState(0);
-  const [status, setStatus] = useState<OrderFilterStatus>("ALL");
-  const [keyword, setKeyword] = useState("");
-  const [reason, setReason] = useState("");
-  const [shipperId, setShipperId] = useState("");
+  const [status, setStatus] = useState<FilterStatus>("ALL");
+  const [totalElements, setTotalElements] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [isFirstPage, setIsFirstPage] = useState(true);
+  const [isLastPage, setIsLastPage] = useState(true);
 
-  const totalPages = useMemo(
-    () => Math.max(1, Math.ceil(total / size)),
-    [total, size],
+  const safeTotalPages = useMemo(() => Math.max(1, totalPages), [totalPages]);
+
+  const selectedOrder = useMemo(
+    () => orders.find((order) => order.orderId === selectedOrderId) ?? null,
+    [orders, selectedOrderId],
   );
 
   const fetchOrders = useCallback(async () => {
@@ -110,14 +103,22 @@ export default function ManagerOrdersPage() {
         page,
         size,
         status,
-        keyword: keyword.trim() || undefined,
       };
+
       const response = await managerOrderManagementService.listOrders(params);
       setOrders(response.data.items);
-      setTotal(response.data.total);
+      setTotalElements(response.data.totalElements);
+      setTotalPages(response.data.totalPages);
+      setIsFirstPage(response.data.first);
+      setIsLastPage(response.data.last);
 
-      if (response.data.items.length > 0 && !selectedOrder) {
-        setSelectedOrder(response.data.items[0]);
+      if (response.data.items.length === 0) {
+        setSelectedOrderId(null);
+      } else if (
+        !selectedOrderId ||
+        !response.data.items.some((item) => item.orderId === selectedOrderId)
+      ) {
+        setSelectedOrderId(response.data.items[0].orderId);
       }
     } catch (fetchError) {
       const message =
@@ -128,35 +129,44 @@ export default function ManagerOrdersPage() {
     } finally {
       setLoading(false);
     }
-  }, [keyword, page, selectedOrder, size, status]);
+  }, [page, selectedOrderId, size, status]);
 
-  async function refreshOrderDetail(orderId: string) {
-    const detail = await managerOrderManagementService.getOrderById(orderId);
-    setSelectedOrder(detail.data);
-  }
+  const runAction = useCallback(
+    async (orderId: string, action: () => Promise<unknown>) => {
+      setActionLoadingOrderId(orderId);
+      setError(null);
 
-  async function runAction(action: () => Promise<unknown>) {
-    setActionLoading(true);
-    setError(null);
-
-    try {
-      await action();
-      await fetchOrders();
-      if (selectedOrder) {
-        await refreshOrderDetail(selectedOrder.id);
+      try {
+        await action();
+        await fetchOrders();
+      } catch (actionError) {
+        const message =
+          actionError instanceof Error
+            ? actionError.message
+            : "Thao tác thất bại";
+        setError(message);
+      } finally {
+        setActionLoadingOrderId(null);
       }
-      setReason("");
-      setShipperId("");
-    } catch (actionError) {
-      const message =
-        actionError instanceof Error
-          ? actionError.message
-          : "Thao tác thất bại";
-      setError(message);
-    } finally {
-      setActionLoading(false);
-    }
-  }
+    },
+    [fetchOrders],
+  );
+
+  const handleNextStatus = useCallback(
+    (orderId: string) => {
+      void runAction(orderId, () =>
+        managerOrderManagementService.nextStatus(orderId),
+      );
+    },
+    [runAction],
+  );
+
+  const handleCancelOrder = useCallback(
+    (orderId: string) => {
+      void runAction(orderId, () => managerOrderManagementService.cancelOrder(orderId));
+    },
+    [runAction],
+  );
 
   useEffect(() => {
     void fetchOrders();
@@ -170,14 +180,11 @@ export default function ManagerOrdersPage() {
             Manager Order Management
           </h1>
           <p className="text-muted-foreground">
-            Duyệt và cập nhật trạng thái đơn hàng.
+            Quản lý trạng thái đơn theo quy trình: Confirmed -&gt; Processing -&gt;
+            Ready -&gt; Completed.
           </p>
         </div>
-        <Button
-          variant="outline"
-          onClick={() => void fetchOrders()}
-          disabled={loading}
-        >
+        <Button variant="outline" onClick={() => void fetchOrders()} disabled={loading}>
           <RefreshCcw className="mr-2 h-4 w-4" />
           Làm mới
         </Button>
@@ -189,28 +196,18 @@ export default function ManagerOrdersPage() {
         <CardHeader>
           <CardTitle>Bộ lọc đơn hàng</CardTitle>
           <CardDescription>
-            Tìm kiếm theo mã/tên khách và lọc trạng thái.
+            Lọc theo 4 trạng thái vận hành chính của hệ thống.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-3">
-          <div className="relative md:col-span-2">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              value={keyword}
-              onChange={(event) => setKeyword(event.target.value)}
-              className="pl-8"
-              placeholder="Nhập mã đơn hoặc tên khách"
-            />
-          </div>
-
           <Select
             value={status}
             onValueChange={(value) => {
-              setStatus(value as OrderFilterStatus);
+              setStatus(value as FilterStatus);
               setPage(0);
             }}
           >
-            <SelectTrigger className="w-full">
+            <SelectTrigger className="w-full md:col-span-2">
               <SelectValue placeholder="Trạng thái" />
             </SelectTrigger>
             <SelectContent>
@@ -222,11 +219,7 @@ export default function ManagerOrdersPage() {
             </SelectContent>
           </Select>
 
-          <Button
-            className="md:col-span-3"
-            onClick={() => void fetchOrders()}
-            disabled={loading}
-          >
+          <Button onClick={() => void fetchOrders()} disabled={loading}>
             Áp dụng bộ lọc
           </Button>
         </CardContent>
@@ -237,49 +230,92 @@ export default function ManagerOrdersPage() {
           <CardHeader>
             <CardTitle>Danh sách đơn hàng</CardTitle>
             <CardDescription>
-              Tổng {total} đơn hàng • Trang {page + 1}/{totalPages}
+              Tổng {totalElements} đơn hàng - Trang {page + 1}/{safeTotalPages}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Mã đơn</TableHead>
-                  <TableHead>Khách hàng</TableHead>
+                  <TableHead>Order ID</TableHead>
+                  <TableHead>User ID</TableHead>
                   <TableHead>Trạng thái</TableHead>
-                  <TableHead className="text-right">Tổng tiền</TableHead>
+                  <TableHead>Pickup</TableHead>
+                  <TableHead className="text-right">Final Amount</TableHead>
+                  <TableHead className="text-right">Món</TableHead>
                   <TableHead className="text-right">Thao tác</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {orders.map((order) => (
-                  <TableRow key={order.id}>
-                    <TableCell className="font-medium">{order.code}</TableCell>
-                    <TableCell>{order.customerName}</TableCell>
-                    <TableCell>
-                      <Badge variant={statusBadgeVariant(order.status)}>
-                        {order.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {formatCurrency(order.totalAmount)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => void refreshOrderDetail(order.id)}
-                      >
-                        Xem
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {orders.map((order) => {
+                  const isCurrent = selectedOrderId === order.orderId;
+                  const isActionLoading =
+                    actionLoadingOrderId === order.orderId || loading;
+                  const showMainActions = order.status !== "COMPLETED";
+
+                  return (
+                    <TableRow
+                      key={order.orderId}
+                      data-state={isCurrent ? "selected" : undefined}
+                      className="cursor-pointer"
+                      onClick={() => setSelectedOrderId(order.orderId)}
+                    >
+                      <TableCell className="font-medium">
+                        {shortId(order.orderId)}
+                      </TableCell>
+                      <TableCell>{shortId(order.userId)}</TableCell>
+                      <TableCell>
+                        <Badge variant={statusBadgeVariant(order.status)}>
+                          {order.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{formatDate(order.pickupAt)}</TableCell>
+                      <TableCell className="text-right">
+                        {formatCurrency(order.finalAmount)}
+                      </TableCell>
+                      <TableCell className="text-right">{order.dishes.length}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          {showMainActions ? (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={isActionLoading}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleNextStatus(order.orderId);
+                                }}
+                              >
+                                <ChevronRight className="mr-1 h-4 w-4" />
+                                Next status
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                disabled={isActionLoading}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleCancelOrder(order.orderId);
+                                }}
+                              >
+                                <Ban className="mr-1 h-4 w-4" />
+                                Cancel
+                              </Button>
+                            </>
+                          ) : (
+                            <Badge>Completed</Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
 
                 {orders.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={5}
+                      colSpan={7}
                       className="text-center text-muted-foreground"
                     >
                       {loading ? "Đang tải..." : "Không có đơn hàng"}
@@ -292,16 +328,16 @@ export default function ManagerOrdersPage() {
             <div className="mt-4 flex items-center justify-end gap-2">
               <Button
                 variant="outline"
-                disabled={page <= 0 || loading}
+                disabled={isFirstPage || loading}
                 onClick={() => setPage((current) => Math.max(0, current - 1))}
               >
                 Trang trước
               </Button>
               <Button
                 variant="outline"
-                disabled={page >= totalPages || loading}
+                disabled={isLastPage || loading}
                 onClick={() =>
-                  setPage((current) => Math.min(totalPages, current + 1))
+                  setPage((current) => Math.min(safeTotalPages - 1, current + 1))
                 }
               >
                 Trang sau
@@ -312,137 +348,114 @@ export default function ManagerOrdersPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Duyệt đơn hàng</CardTitle>
+            <CardTitle>Chi tiết đơn</CardTitle>
             <CardDescription>
               {selectedOrder
-                ? `Đơn ${selectedOrder.code}`
-                : "Chọn một đơn để thao tác"}
+                ? `Đơn ${shortId(selectedOrder.orderId)}`
+                : "Chọn một đơn để xem chi tiết"}
             </CardDescription>
           </CardHeader>
-
           <CardContent className="space-y-3">
             {!selectedOrder ? (
-              <p className="text-sm text-muted-foreground">
-                Chưa chọn đơn hàng.
-              </p>
+              <p className="text-sm text-muted-foreground">Chưa chọn đơn hàng.</p>
             ) : (
               <>
                 <div className="rounded-lg border p-3 text-sm space-y-1">
                   <p>
-                    <span className="font-medium">Khách:</span>{" "}
-                    {selectedOrder.customerName}
+                    <span className="font-medium">Order ID:</span>{" "}
+                    {selectedOrder.orderId}
                   </p>
                   <p>
-                    <span className="font-medium">SĐT:</span>{" "}
-                    {selectedOrder.customerPhone || "-"}
-                  </p>
-                  <p>
-                    <span className="font-medium">Địa chỉ:</span>{" "}
-                    {selectedOrder.shippingAddress || "-"}
+                    <span className="font-medium">User ID:</span>{" "}
+                    {selectedOrder.userId}
                   </p>
                   <p>
                     <span className="font-medium">Trạng thái:</span>{" "}
                     {selectedOrder.status}
                   </p>
+                  <p>
+                    <span className="font-medium">Tạo lúc:</span>{" "}
+                    {formatDate(selectedOrder.createdAt)}
+                  </p>
+                  <p>
+                    <span className="font-medium">Pickup lúc:</span>{" "}
+                    {formatDate(selectedOrder.pickupAt)}
+                  </p>
+                  <p>
+                    <span className="font-medium">Ghi chú:</span>{" "}
+                    {selectedOrder.note || "-"}
+                  </p>
                 </div>
 
-                <Input
-                  value={reason}
-                  onChange={(event) => setReason(event.target.value)}
-                  placeholder="Lý do từ chối/hủy"
-                />
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-lg border p-2">
+                    <p className="text-xs text-muted-foreground">Total</p>
+                    <p className="font-medium">
+                      {formatCurrency(selectedOrder.totalPrice)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border p-2">
+                    <p className="text-xs text-muted-foreground">Discount</p>
+                    <p className="font-medium">
+                      {formatCurrency(selectedOrder.discountAmount)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border p-2">
+                    <p className="text-xs text-muted-foreground">Final</p>
+                    <p className="font-medium">
+                      {formatCurrency(selectedOrder.finalAmount)}
+                    </p>
+                  </div>
+                </div>
 
-                <Input
-                  value={shipperId}
-                  onChange={(event) => setShipperId(event.target.value)}
-                  placeholder="Shipper ID"
-                />
+                <div className="rounded-lg border p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="text-sm font-medium">Danh sách món</p>
+                    <Badge variant="outline">{selectedOrder.dishes.length} món</Badge>
+                  </div>
 
-                <Select
-                  onValueChange={(value) => {
-                    void runAction(() =>
-                      managerOrderManagementService.updateOrderStatus(
-                        selectedOrder.id,
-                        value as OrderStatus,
-                      ),
-                    );
-                  }}
-                  disabled={actionLoading}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Cập nhật trạng thái" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {statusActionOptions.map((item) => (
-                      <SelectItem key={item} value={item}>
-                        {item}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  {selectedOrder.dishes.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Không có món trong đơn.</p>
+                  ) : (
+                    <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1">
+                      {selectedOrder.dishes.map((dish) => (
+                        <div key={dish.orderDishId} className="rounded-md border p-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <p className="text-sm font-medium">{dish.dishName || "-"}</p>
+                              <p className="text-xs text-muted-foreground">
+                                Qty: {dish.quantity} - Calories: {dish.dishCalories}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <Badge variant="outline">{dish.dishStatus || "-"}</Badge>
+                              <p className="text-xs font-medium mt-1">
+                                {formatCurrency(dish.lineTotal)}
+                              </p>
+                            </div>
+                          </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    disabled={actionLoading}
-                    onClick={() =>
-                      void runAction(() =>
-                        managerOrderManagementService.approveOrder(
-                          selectedOrder.id,
-                        ),
-                      )
-                    }
-                  >
-                    <CheckCircle2 className="mr-2 h-4 w-4" />
-                    Duyệt
-                  </Button>
-
-                  <Button
-                    variant="destructive"
-                    disabled={actionLoading || !reason.trim()}
-                    onClick={() =>
-                      void runAction(() =>
-                        managerOrderManagementService.rejectOrder(
-                          selectedOrder.id,
-                          reason.trim(),
-                        ),
-                      )
-                    }
-                  >
-                    <XCircle className="mr-2 h-4 w-4" />
-                    Từ chối
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    disabled={actionLoading || !shipperId.trim()}
-                    onClick={() =>
-                      void runAction(() =>
-                        managerOrderManagementService.assignShipper(
-                          selectedOrder.id,
-                          shipperId.trim(),
-                        ),
-                      )
-                    }
-                  >
-                    <Truck className="mr-2 h-4 w-4" />
-                    Gán shipper
-                  </Button>
-
-                  <Button
-                    variant="destructive"
-                    disabled={actionLoading || !reason.trim()}
-                    onClick={() =>
-                      void runAction(() =>
-                        managerOrderManagementService.cancelOrder(
-                          selectedOrder.id,
-                          reason.trim(),
-                        ),
-                      )
-                    }
-                  >
-                    <Ban className="mr-2 h-4 w-4" />
-                    Hủy đơn
-                  </Button>
+                          {dish.customItems.length > 0 ? (
+                            <div className="mt-2 border-t pt-2 space-y-1">
+                              {dish.customItems.map((item) => (
+                                <div
+                                  key={item.orderDishItemId}
+                                  className="flex items-center justify-between gap-2 text-xs"
+                                >
+                                  <p className="truncate">
+                                    {item.itemName} ({item.quantity} {item.unit})
+                                  </p>
+                                  <p className="font-medium">
+                                    {formatCurrency(item.price)}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </>
             )}
@@ -452,3 +465,4 @@ export default function ManagerOrdersPage() {
     </div>
   );
 }
+
