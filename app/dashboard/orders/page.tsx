@@ -251,7 +251,9 @@ export default function ManagerOrdersPage() {
                   const isCurrent = selectedOrderId === order.orderId;
                   const isActionLoading =
                     actionLoadingOrderId === order.orderId || loading;
-                  const showMainActions = order.status !== "COMPLETED";
+                  const showMainActions =
+                    order.status !== "COMPLETED" &&
+                    order.status !== "CANCELLED";
 
                   return (
                     <TableRow
@@ -303,9 +305,7 @@ export default function ManagerOrdersPage() {
                                 Cancel
                               </Button>
                             </>
-                          ) : (
-                            <Badge>Completed</Badge>
-                          )}
+                          ) : null}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -360,6 +360,32 @@ export default function ManagerOrdersPage() {
               <p className="text-sm text-muted-foreground">Chưa chọn đơn hàng.</p>
             ) : (
               <>
+                {selectedOrder.status !== "COMPLETED" &&
+                selectedOrder.status !== "CANCELLED" ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      variant="outline"
+                      disabled={
+                        actionLoadingOrderId === selectedOrder.orderId || loading
+                      }
+                      onClick={() => handleNextStatus(selectedOrder.orderId)}
+                    >
+                      <ChevronRight className="mr-1 h-4 w-4" />
+                      Next status
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      disabled={
+                        actionLoadingOrderId === selectedOrder.orderId || loading
+                      }
+                      onClick={() => handleCancelOrder(selectedOrder.orderId)}
+                    >
+                      <Ban className="mr-1 h-4 w-4" />
+                      Cancel
+                    </Button>
+                  </div>
+                ) : null}
+
                 <div className="rounded-lg border p-3 text-sm space-y-1">
                   <p>
                     <span className="font-medium">Order ID:</span>{" "}

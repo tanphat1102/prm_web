@@ -2,7 +2,6 @@
 
 import {
   Home,
-  Users,
   Leaf,
   CreditCard,
   Megaphone,
@@ -26,13 +25,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const menuItems = [
   { title: "Dashboard", url: "/dashboard", icon: Home },
-  { title: "User", url: "/dashboard/users", icon: Users },
   { title: "Promotion", url: "/dashboard/promotions", icon: Megaphone },
   { title: "Dish", url: "/dashboard/dishes", icon: Package },
   { title: "Nutrient", url: "/dashboard/nutrients", icon: Leaf },
   {
-    title: "Payment managment",
-    url: "/dashboard/payment-management",
+    title: "Order management",
+    url: "/dashboard/orders",
     icon: CreditCard,
   },
 ];
