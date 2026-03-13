@@ -46,6 +46,22 @@ export type ListOrdersParams = {
   keyword?: string;
 };
 
+type RawManagerOrder = Partial<ManagerOrder> & {
+  customer?: {
+    name?: string;
+    fullName?: string;
+    phone?: string;
+  };
+  customerFullName?: string;
+  phoneNumber?: string;
+  total?: number | string;
+  amount?: number | string;
+  finalAmount?: number | string;
+  shippingFee?: number | string;
+  address?: string;
+  deliveryAddress?: string;
+};
+
 function buildQuery(params: ListOrdersParams) {
   const search = new URLSearchParams();
 
@@ -99,8 +115,8 @@ async function requestWithAuth<TResponse>(
 }
 
 type RawOrderList = {
-  content?: ManagerOrder[];
-  items?: ManagerOrder[];
+  content?: RawManagerOrder[];
+  items?: RawManagerOrder[];
   totalElements?: number;
   total?: number;
   number?: number;
@@ -108,6 +124,39 @@ type RawOrderList = {
   size?: number;
   limit?: number;
 };
+
+function normalizeMoney(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+function normalizeOrder(order: RawManagerOrder): ManagerOrder {
+  return {
+    id: order.id ?? "",
+    code: order.code ?? "",
+    customerName:
+      order.customerName ??
+      order.customer?.name ??
+      order.customer?.fullName ??
+      order.customerFullName ??
+      "Khách hàng chưa xác định",
+    customerPhone:
+      order.customerPhone ?? order.customer?.phone ?? order.phoneNumber,
+    totalAmount: normalizeMoney(
+      order.totalAmount ?? order.total ?? order.amount ?? order.finalAmount,
+    ),
+    status: (order.status ?? "PENDING") as OrderStatus,
+    createdAt: order.createdAt ?? "",
+    shippingAddress:
+      order.shippingAddress ?? order.address ?? order.deliveryAddress,
+    notes: order.notes,
+    shipperId: order.shipperId,
+  };
+}
 
 function unwrapPayload<T>(payload: unknown): T {
   const wrapped = payload as ApiResponse<T>;
@@ -126,8 +175,10 @@ function normalizeOrderList(payload: unknown): ApiResponse<OrderListResponse> {
   const unwrapped = unwrapPayload<RawOrderList>(payload);
 
   const items =
-    (Array.isArray(unwrapped?.items) ? unwrapped.items : undefined) ||
-    (Array.isArray(unwrapped?.content) ? unwrapped.content : []);
+    (
+      (Array.isArray(unwrapped?.items) ? unwrapped.items : undefined) ||
+      (Array.isArray(unwrapped?.content) ? unwrapped.content : [])
+    ).map(normalizeOrder);
 
   const total = unwrapped?.total ?? unwrapped?.totalElements ?? items.length;
   const page = unwrapped?.page ?? unwrapped?.number ?? 0;
@@ -145,6 +196,16 @@ function normalizeOrderList(payload: unknown): ApiResponse<OrderListResponse> {
   };
 }
 
+function normalizeOrderDetail(payload: unknown): ApiResponse<ManagerOrder> {
+  const unwrapped = unwrapPayload<RawManagerOrder>(payload);
+
+  return {
+    success: true,
+    message: "OK",
+    data: normalizeOrder(unwrapped ?? {}),
+  };
+}
+
 export const managerOrderManagementService = {
   async listOrders(params: ListOrdersParams) {
     const payload = await requestWithAuth<unknown>(
@@ -154,9 +215,9 @@ export const managerOrderManagementService = {
   },
 
   getOrderById(orderId: string) {
-    return requestWithAuth<ApiResponse<ManagerOrder>>(
+    return requestWithAuth<unknown>(
       `/api/manager/orders/${orderId}`,
-    );
+    ).then(normalizeOrderDetail);
   },
 
   approveOrder(orderId: string) {

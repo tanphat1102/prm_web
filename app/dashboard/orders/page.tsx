@@ -73,6 +73,14 @@ function statusBadgeVariant(
   return "outline";
 }
 
+function formatCurrency(value: number | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return "0₫";
+  }
+
+  return `${value.toLocaleString("vi-VN")}₫`;
+}
+
 export default function ManagerOrdersPage() {
   const [orders, setOrders] = useState<ManagerOrder[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<ManagerOrder | null>(null);
@@ -254,7 +262,7 @@ export default function ManagerOrdersPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      {order.totalAmount.toLocaleString("vi-VN")}₫
+                      {formatCurrency(order.totalAmount)}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button
