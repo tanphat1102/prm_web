@@ -39,9 +39,10 @@ NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=prm392-kitchen.firebaseapp.com
 NEXT_PUBLIC_FIREBASE_PROJECT_ID=prm392-kitchen
 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=prm392-kitchen.firebasestorage.app
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=315695684466
-
-NEXT_PUBLIC_MANAGER_API_BASE_URL=https://chicken-kitchen.milize-lena.space
 ```
+
+Tất cả service backend hiện dùng chung `DEFAULT_API_BASE_URL`
+trong `/lib/config/api.ts`.
 
 ## 4. Sử dụng
 

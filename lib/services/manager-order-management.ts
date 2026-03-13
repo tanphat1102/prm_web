@@ -66,7 +66,7 @@ async function requestWithAuth<TResponse>(
 ): Promise<TResponse> {
   const accessToken = getAccessToken();
 
-  const response = await fetch(buildApiUrl(path, "manager"), {
+  const response = await fetch(buildApiUrl(path), {
     ...init,
     headers: {
       "Content-Type": "application/json",

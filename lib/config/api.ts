@@ -9,18 +9,7 @@ export const API_BASE_URL =
   // normalizeBaseUrl(process.env.NEXT_PUBLIC_API_BASE_URL) ||
   DEFAULT_API_BASE_URL;
 
-export const MANAGER_API_BASE_URL =
-  // normalizeBaseUrl(process.env.NEXT_PUBLIC_MANAGER_API_BASE_URL) ||
-  API_BASE_URL;
-
-type ApiScope = "default" | "manager";
-
-const API_BASE_URLS: Record<ApiScope, string> = {
-  default: API_BASE_URL,
-  manager: MANAGER_API_BASE_URL,
-};
-
-export function buildApiUrl(path: string, scope: ApiScope = "default"): string {
+export function buildApiUrl(path: string): string {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  return `${API_BASE_URLS[scope]}${normalizedPath}`;
+  return `${API_BASE_URL}${normalizedPath}`;
 }
