@@ -17,8 +17,10 @@ export type RefreshTokenRequest = {
   refreshToken: string;
 };
 
+const DEFAULT_API_BASE_URL = "https://chicken-kitchen.milize-lena.space";
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "";
+  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ||
+  DEFAULT_API_BASE_URL;
 
 async function postJson<TResponse, TBody = unknown>(
   path: string,

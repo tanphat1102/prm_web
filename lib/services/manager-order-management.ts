@@ -9,12 +9,13 @@ import {
   saveAuthTokens,
 } from "@/lib/services/token-storage";
 
+const DEFAULT_API_BASE_URL = "https://chicken-kitchen.milize-lena.space";
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "";
+  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ||
+  DEFAULT_API_BASE_URL;
 const MANAGER_API_BASE_URL =
   process.env.NEXT_PUBLIC_MANAGER_API_BASE_URL?.replace(/\/$/, "") ||
-  API_BASE_URL ||
-  "https://chicken-kitchen.milize-lena.space/";
+  API_BASE_URL;
 
 export type OrderStatus =
   | "PENDING"
