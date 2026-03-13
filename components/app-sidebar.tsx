@@ -3,12 +3,10 @@
 import {
   Home,
   Users,
-  FileText,
-  Settings,
-  BarChart3,
-  ShoppingCart,
+  Leaf,
+  CreditCard,
+  Megaphone,
   Package,
-  TrendingUp,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
@@ -28,13 +26,15 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const menuItems = [
   { title: "Dashboard", url: "/dashboard", icon: Home },
-  { title: "Analytics", url: "/dashboard/analytics", icon: BarChart3 },
-  { title: "Sales", url: "/dashboard/sales", icon: TrendingUp },
-  { title: "Products", url: "/dashboard/products", icon: Package },
-  { title: "Orders", url: "/dashboard/orders", icon: ShoppingCart },
-  { title: "Customers", url: "/dashboard/customers", icon: Users },
-  { title: "Reports", url: "/dashboard/reports", icon: FileText },
-  { title: "Settings", url: "/dashboard/settings", icon: Settings },
+  { title: "User", url: "/dashboard/users", icon: Users },
+  { title: "Promotion", url: "/dashboard/promotions", icon: Megaphone },
+  { title: "Dish", url: "/dashboard/dishes", icon: Package },
+  { title: "Nutrient", url: "/dashboard/nutrients", icon: Leaf },
+  {
+    title: "Payment managment",
+    url: "/dashboard/payment-management",
+    icon: CreditCard,
+  },
 ];
 
 export function AppSidebar() {
@@ -57,7 +57,14 @@ export function AppSidebar() {
             <SidebarMenu>
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={pathname === item.url}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={
+                      item.url === "/dashboard"
+                        ? pathname === item.url
+                        : pathname.startsWith(item.url)
+                    }
+                  >
                     <Link href={item.url}>
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
